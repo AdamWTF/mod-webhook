@@ -11,7 +11,7 @@ class WebhookPlayerScripts : public PlayerScript
 public:
     WebhookPlayerScripts() : PlayerScript("WebhookPlayerScripts") { }
 
-    void OnPlayerUpdate(Player* player, uint32 p_time) override
+    void OnPlayerUpdate(Player* player, uint32 /*p_time*/) override
     {
        // 1. Get player data
         uint32 guid = player->GetGUID().GetCounter();

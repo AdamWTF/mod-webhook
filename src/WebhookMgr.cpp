@@ -81,7 +81,7 @@ void WebhookMgr::ProcessMessages()
     LOG_INFO("server.worldserver", "Webhook processor closed.");
 }
 
-void WebhookMgr::SendHttpPost(const std::string& rawMessage)
+void WebhookMgr::SendHttpPost(const std::string& jsonPayload)
 {
     try {
         if (_webhookUrl.empty())
