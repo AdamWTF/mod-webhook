@@ -23,7 +23,7 @@ public:
         std::stringstream json;
         json << "{"
              << "\"guid\": " << guid << ", "
-             << "\"name\": " << std::quoted(name) << ", "
+             << "\"name\": \"" << name << "\", "
              << "\"position_x\": " << x << ", "
              << "\"position_y\": " << y
              << "}";

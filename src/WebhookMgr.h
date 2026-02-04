@@ -15,7 +15,7 @@ private:
     std::mutex _queueMutex;
     std::condition_variable _condition;
     void ProcessMessages();
-    void SendDiscordWebhook(const std::string& message);
+    void SendHttpPost(const std::string& message);
 
 public:
     static WebhookMgr* instance();
