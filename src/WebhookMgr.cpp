@@ -73,7 +73,7 @@ void WebhookMgr::ProcessMessages()
         }
 
         // Send the message (rate-limited)
-        SendDiscordWebhook(message);
+        SendHttpPost(message);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(600)); // Break for rate limit. Currently, 5 requests per 2 seconds
     }
@@ -81,80 +81,77 @@ void WebhookMgr::ProcessMessages()
     LOG_INFO("server.worldserver", "Webhook processor closed.");
 }
 
-void WebhookMgr::SendDiscordWebhook(const std::string& rawMessage)
+void WebhookMgr::SendHttpPost(const std::string& rawMessage)
 {
     try {
-        // Extract Discord API path from the webhook URL
-        const std::string host = "discord.com";
-        const std::string port = "443";
-
-        if (std::empty(_webhookUrl))
+        if (_webhookUrl.empty())
         {
-            LOG_ERROR("server.loading", "The webhook url is empty. Please provide one.");
-            Stop();
+            LOG_ERROR("server.loading", "The webhook url is empty.");
             return;
         }
 
-        size_t apiStart = _webhookUrl.find("/api/webhooks");
-        if (apiStart == std::string::npos)
-        {
-            LOG_ERROR("server.worldserver", "Invalid webhook url provided. Stopping module.");
-            Stop();
-            return;
+        // 1. Parse the global _webhookUrl
+        // Expected: https://domain.com/api/path...
+        std::string host, apiPath;
+        std::string urlCopy = _webhookUrl;
+
+        // Remove "https://" or "http://" prefix
+        size_t protoEnd = urlCopy.find("://");
+        if (protoEnd != std::string::npos)
+            urlCopy.erase(0, protoEnd + 3);
+
+        // Split into Host and Path
+        size_t pathStart = urlCopy.find("/");
+        if (pathStart == std::string::npos) {
+            host = urlCopy;
+            apiPath = "/";
+        } else {
+            host = urlCopy.substr(0, pathStart);
+            apiPath = urlCopy.substr(pathStart);
         }
-        const std::string apiPath = _webhookUrl.substr(apiStart);
 
-        // Format the message into JSON
-        std::string formattedMessage = R"({"content":")" + rawMessage + R"("})";
-
-        // Boost.Asio context and resolver setup
+        // 2. Setup Network Contexts
         boost::asio::io_context io_context;
         boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23_client);
         boost::asio::ip::tcp::resolver resolver(io_context);
         boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(io_context, ssl_context);
 
-        // Resolve Discord's address
-        auto endpoints = resolver.resolve(host, port);
+        // 3. Connect & Handshake (Targeting HTTPS Port 443)
+        auto const endpoints = resolver.resolve(host, "443");
         boost::asio::connect(stream.next_layer(), endpoints);
-
-        // Perform the SSL handshake
         stream.handshake(boost::asio::ssl::stream_base::client);
 
-        // Construct the HTTP POST request
+        // 4. Construct HTTP POST Request
         std::string request =
             "POST " + apiPath + " HTTP/1.1\r\n" +
             "Host: " + host + "\r\n" +
             "Content-Type: application/json\r\n" +
-            "Content-Length: " + std::to_string(formattedMessage.size()) + "\r\n" +
+            "Content-Length: " + std::to_string(jsonPayload.size()) + "\r\n" +
             "Connection: close\r\n\r\n" +
-            formattedMessage;
+            jsonPayload;
 
-        // Send the request
+        // 5. Send and Read Response Status
         boost::asio::write(stream, boost::asio::buffer(request));
 
-        // Read the response
         boost::asio::streambuf response;
         boost::asio::read_until(stream, response, "\r\n");
-
-        // Print the response status
         std::istream response_stream(&response);
+        
         std::string http_version;
         unsigned int status_code;
-        std::string status_message;
         response_stream >> http_version >> status_code;
-        std::getline(response_stream, status_message);
 
-        if(status_code != 204)
+        if (status_code < 200 || status_code >= 300)
         {
             std::ostringstream ss;
-            ss << "Failed to send webhook.HTTP Status : " << status_code << " " << status_message << std::endl;
+            ss << "POST failed. Host: " << host << " Status: " << status_code;
             LOG_ERROR("server.worldserver", ss.str());
         }
     }
     catch (const std::exception& e)
     {
         std::ostringstream ss;
-        ss << "Error: " << e.what() << std::endl;
+        ss << "Network Error: " << e.what();
         LOG_ERROR("server.worldserver", ss.str());
     }
 }
