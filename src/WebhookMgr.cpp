@@ -90,51 +90,60 @@ void WebhookMgr::SendHttpPost(const std::string& jsonPayload)
             return;
         }
 
-        // 1. Parse the global _webhookUrl
-        // Expected: https://domain.com/api/path...
-        std::string host, apiPath;
+        std::string host, apiPath, port = "80";
         std::string urlCopy = _webhookUrl;
 
-        // Remove "https://" or "http://" prefix
+        bool isHttps = (urlCopy.substr(0, 5) == "https");
+
         size_t protoEnd = urlCopy.find("://");
         if (protoEnd != std::string::npos)
             urlCopy.erase(0, protoEnd + 3);
 
-        // Split into Host and Path
         size_t pathStart = urlCopy.find("/");
-        if (pathStart == std::string::npos) {
-            host = urlCopy;
-            apiPath = "/";
-        } else {
-            host = urlCopy.substr(0, pathStart);
+        if (pathStart != std::string::npos) {
             apiPath = urlCopy.substr(pathStart);
+            urlCopy = urlCopy.substr(0, pathStart);
+        } else {
+            apiPath = "/";
         }
 
-        // 2. Setup Network Contexts
+        size_t portColon = urlCopy.find(":");
+        if (portColon != std::string::npos) {
+            host = urlCopy.substr(0, portColon);
+            port = urlCopy.substr(portColon + 1);
+        } else {
+            host = urlCopy;
+            port = isHttps ? "443" : "80";
+        }
+
         boost::asio::io_context io_context;
-        boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23_client);
         boost::asio::ip::tcp::resolver resolver(io_context);
-        boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(io_context, ssl_context);
+        auto const endpoints = resolver.resolve(host, port);
 
-        // 3. Connect & Handshake (Targeting HTTPS Port 443)
-        auto const endpoints = resolver.resolve(host, "443");
-        boost::asio::connect(stream.next_layer(), endpoints);
-        stream.handshake(boost::asio::ssl::stream_base::client);
+        /*if (isHttps) {
+            boost::asio::ssl::context ssl_context(boost::asio::ssl::context::sslv23_client);
+            boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(io_context, ssl_context);
+            
+            boost::asio::connect(stream.next_layer(), endpoints);
+            stream.handshake(boost::asio::ssl::stream_base::client);
+            SendRequest(stream, host, apiPath, jsonPayload); // Helper or inline
+        }*/
 
-        // 4. Construct HTTP POST Request
+        boost::asio::ip::tcp::socket socket(io_context);
+        boost::asio::connect(socket, endpoints);
+        
         std::string request =
             "POST " + apiPath + " HTTP/1.1\r\n" +
-            "Host: " + host + "\r\n" +
+            "Host: " + host + ":" + port + "\r\n" +
             "Content-Type: application/json\r\n" +
             "Content-Length: " + std::to_string(jsonPayload.size()) + "\r\n" +
             "Connection: close\r\n\r\n" +
             jsonPayload;
 
-        // 5. Send and Read Response Status
-        boost::asio::write(stream, boost::asio::buffer(request));
+        boost::asio::write(socket, boost::asio::buffer(request));
 
         boost::asio::streambuf response;
-        boost::asio::read_until(stream, response, "\r\n");
+        boost::asio::read_until(socket, response, "\r\n");
         std::istream response_stream(&response);
         
         std::string http_version;
