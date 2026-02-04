@@ -75,7 +75,7 @@ void WebhookMgr::ProcessMessages()
         // Send the message (rate-limited)
         SendHttpPost(message);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(600)); // Break for rate limit. Currently, 5 requests per 2 seconds
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
     LOG_INFO("server.worldserver", "Webhook processor closed.");

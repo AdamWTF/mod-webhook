@@ -15,17 +15,22 @@ public:
     {
        // 1. Get player data
         uint32 guid = player->GetGUID().GetCounter();
+        uint32 zoneId = player->GetZoneId();
         std::string name = player->GetName();
         float x = player->GetPositionX();
         float y = player->GetPositionY();
+        float z = player->GetPositionZ();
 
         // 2. Build the JSON object string
         std::stringstream json;
         json << "{"
+             << "\"event\": \"player_update\", "
              << "\"guid\": " << guid << ", "
              << "\"name\": \"" << name << "\", "
              << "\"position_x\": " << x << ", "
-             << "\"position_y\": " << y
+             << "\"position_y\": " << y << ", "
+             << "\"position_z\": " << z << ", "
+             << "\"zone_id\": " << zoneId
              << "}";
 
        sWebhookMgr->ScheduleMessage(json.str()); // Schedule the message
