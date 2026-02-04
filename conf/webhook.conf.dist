@@ -5,13 +5,11 @@
 [worldserver]
 
 ########################################
-# My module configuration
+# webhook configuration
 ########################################
 #
-#    MyModule.Enable
-#        Description: Enable my module and print "Hello World" message at server start
-#        Default:     0 - Disabled
-#                     1 - Enabled
+#    Webhook.URL
+#        Description: The webhook url provided by discord
 #
 
-MyModule.Enable = 1
+Webhook.URL = ""
