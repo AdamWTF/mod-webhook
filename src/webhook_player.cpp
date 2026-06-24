@@ -88,22 +88,7 @@ public:
         }
 
         std::stringstream ss;
-        ss << "Player " << player->GetName() << " just reached level " << player->getLevel() << ".";
-
-        std::string message = ss.str();
-
-        sWebhookMgr->ScheduleMessage(message);
-    }
-
-    void OnPlayerAchievementComplete(Player* player, AchievementEntry const* achievement) override
-    {
-        if (IsPlayerBot(player))
-        {
-            return;
-        }
-
-        std::stringstream ss;
-        ss << "Player " << player->GetName() << " just earned the achievement " << achievement->Title << ".";
+        ss << "Player " << player->GetName() << " just reached level " << player->GetLevel() << ".";
 
         std::string message = ss.str();
 
